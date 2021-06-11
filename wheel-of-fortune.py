@@ -1,171 +1,218 @@
+''' Pseudocode for wheel of fortune
+- create the wheel (54 potential slots)
+    twenty-four slots with the $1 symbol, 
+    fifteen with the $2, 
+    seven with the $5, 
+    four with the $10, 
+    two each for the $20 and the Joker ($40).
+- read phrases.json file
+- initialize variables
+    - each player's winnings (array)
+    - currentPlayer
+    - list of guesses
+    - randomly select a category / phrase as phrase
+
+- display wheel
+- display labels
+    - category as hint 
+    - blank phrase
+    - current player
+    - guesses used
+    - current scores
+- display buttons
+    - submit guess
+    - reset game
+
+'''
 # dependencies
 import os, sys # lets you have operating system tools
 import random
-import tkinter as tk
+from tkinter import *
+import json
+import time
 
-# guessing game refactored with tkinter
+# load json
+f = open('hangman_python/phrases.json',)
+json_object = json.load(f)
+categories = list(json_object.keys())
+
 # Top level window
-frame = tk.Tk()
-frame.title("Guessing Game")
-frame.geometry('200x200')
-# Function for getting Input from textbox and printing it at label widget
-  
+root = Tk()
+root.title("Wheel of Fortune")
+root.geometry('800x400')
+
+main_frame = Frame(root)
+wheel_frame = Frame(root)
+
+wheel_frame.pack(side = RIGHT)
+main_frame.pack(side = LEFT, padx=20)
+
+# reset all variables to restart game
 def reset():
-    global guesses, playing, win, complete, numGuesses, numWrongGuesses, maxGuesses, phrase, phrase_list, emptyPhrase
+    global guesses, numRounds, phrase, phrase_list, emptyPhrase
     guesses = []
-    playing = True
-    win = False
-    complete = False
-    numGuesses = 0
-    numWrongGuesses=0
-    maxGuesses = 7
-    phrase = getPhrase(phrases, phrase_list)
+
+    phrase = getPhrase(categories, phrase_list)
     phrase_list.append(phrase)
-    emptyPhrase = getPhraseBlank()
+    emptyPhrase = getPhraseBlank(phrase)
 
-    lbl.config(text="Make a guess to begin")
-    moveslbl.config(text = f'{maxGuesses-numWrongGuesses} wrong guesses left')
+    lblGuesses.config(text="Make a guess to begin")
+    lblRounds.config(text = f'{numRounds} rounds left')
     lblError.config(text = "")
-    phraselbl.config(text=getPhraseBlank())
-    winslbl.config(text = f"Number of wins: {numWins}")
-    playerlbl.config(text=f"It's player {currentPlayer}s turn")
+    lblPhrase.config(text=getPhraseBlank(phrase))
+    lblPlayer.config(text=f"Player {currentPlayer}")
 
-    print(phrase)
-
-def getPhraseBlank():
+# generate blank array of phrase - COMPLETE
+def getPhraseBlank(phrase):
     emptyPhrase = []
     for i in range(0, len(phrase)):
-        if phrase[i] in '., !\'':
+        if phrase[i] in '., !\'&%^*$#@();:-':
             emptyPhrase.append(phrase[i])
-        if phrase[i] in guesses:
+        elif phrase[i] in guesses:
             emptyPhrase.append(phrase[i])
         else:
             emptyPhrase.append('_')
-    return emptyPhrase
+    return ''.join(emptyPhrase)
 
-def getPhrase(phrases, phrase_list):
-    phraseIndex = random.randint(1, len(phrases))
-    phrase = phrases[phraseIndex]
-    while phrase in phrase_list:
-        phraseIndex = random.randint(1, len(phrases))
-        phrase = phrases[phraseIndex]
-    return phrase
+# randomly select a phrase from random category - COMPLETE
+def getPhrase(categories, phrase_list):
+    randCat = categories[random.randint(0, len(categories)-1)]
+    randCatPhrase = json_object[randCat][random.randint(0, len(json_object[randCat])-1)].lower()
+    while randCatPhrase in phrase_list:
+        randCat = categories[random.randint(0, len(categories))]
+        randCatPhrase = json_object[randCat][random.randint(0, len(json_object[randCat]))].lower()
+    
+    print(f"Category: {randCat}, Phrase: {randCatPhrase}")
+    return randCatPhrase
 
+# prompt for input to make a new guess
 def makeGuess():
-    global win, currentPlayer
-    global numWins
-    global numWrongGuesses
-    global numGuesses
     inp = inputtxt.get(1.0, "end-1c")
     valid = checkGuess(inp, guesses, phrase)
-    if maxGuesses == numWrongGuesses:
-        moveslbl.config(text = f"You lost. Completed {numGuesses} moves")
-        lblError.config(text = f"Try again")
-        phraselbl.config(text=phrase)
-        winslbl.config(text = f"Number of wins: {numWins}")
-        
-    elif valid:
-        numGuesses+=1
-        guesses.append(inp)
-        guessesString = ','.join(guesses)
-        lbl.config(text = f"Guesses: {guessesString}")
-        phraselbl.config(text=getPhraseBlank())
-        moveslbl.config(text=f'{maxGuesses-numWrongGuesses} wrong guesses left')
-        playerlbl.config(text=f"It's player {currentPlayer}s turn")
-    
-    if inp == phrase or '_' not in getPhraseBlank():
-        numWins+=1
-        moveslbl.config(text = f"Player {currentPlayer} won! Completed in {numGuesses} moves")
-        lblError.config(text = f"You guessed the correct word!")
-        phraselbl.config(text=phrase)
-        winslbl.config(text = f"Number of wins: {numWins}")
-
+    checkWin(inp, phrase, valid)
     inputtxt.delete("1.0","end")
 
+# check that guess is acceptable - TODO
 def checkGuess(guess, guesses, phrase):
-    global currentPlayer, player, numWrongGuesses
-    if guess in guesses:
+    global currentPlayer
+    if len(guess) > 1 and guess!=phrase:
+        lblError.config(text = "Guess is too long, try again")
+        return False
+    elif guess in guesses:
         lblError.config(text = "That has been guessed already, try again")
-        inputtxt.delete("1.0","end")
         return False
     elif not guess.isalpha():
         lblError.config(text = "Please enter a letter")
-        inputtxt.delete("1.0","end")
         return False
     elif guess not in phrase:
         if currentPlayer < players:
             currentPlayer+=1
         else:
             currentPlayer=1
-        numWrongGuesses+=1
-        inputtxt.delete("1.0","end")
-        playerlbl.config(text=f"It's player {currentPlayer}s turn")
+        lblPlayer.config(text=f"Player {currentPlayer}")
         lblError.config(text = "Not in the phrase")
         return True
     else:
         lblError.config(text = "In the phrase!")
         return True
 
-# guessing game variables
-f = open('english-words/words_alpha.txt', 'r')
-global guesses, playing, win, complete, numGuesses, numWrongGuesses, maxGuesses, phrase, phrase_list, emptyPhrase, currentPlayer, players
+def checkWin(inp, phrase, valid):
+    # determine state of game after guess
+    global numRounds
+    if valid:
+        guesses.append(inp)
+        guessesString = ','.join(guesses)
+        lblGuesses.config(text = f"Guesses: {guessesString}")
+        lblPhrase.config(text=getPhraseBlank(phrase))
+        lblPlayer.config(text=f"Player {currentPlayer}")
+    if inp == phrase or '_' not in getPhraseBlank(phrase):
+        lblRounds.config(text = f"{numRounds} rounds left")
+        lblError.config(text = f"Player {currentPlayer} guessed the correct word!")
+        lblPhrase.config(text=phrase)
 
-phrases = []
-players = 2
+def drawWheel(wheelCanvas):
+    coordinates =  20, 20, 300, 320
+    incr = 360/54
+    for i in range(0,54):
+        if i%5==0:
+            arc = wheelCanvas.create_arc(coordinates, start=i*incr, extent=incr, fill="red")
+        else:
+            arc = wheelCanvas.create_arc(coordinates, start=i*incr, extent=incr, fill="blue")
+
+def rotate():
+    global wheelVector
+    wheelCanvas.delete()
+    coordinates =  20, 20, 300, 320
+    incr = 360/54
+    for i in range(0,54):
+        '''twenty-four slots with the $1 symbol, 
+            fifteen with the $2, 
+            seven with the $5, 
+            four with the $10, 
+            two each for the $20 and the Joker ($40).
+        '''
+        if i%5==0:
+            arc = wheelCanvas.create_arc(coordinates, start=i*incr, extent=incr, fill="red")
+        else:
+            arc = wheelCanvas.create_arc(coordinates, start=i*incr, extent=incr, fill="blue")
+
+def randomValue():
+    
+# initialize variables
+players = 3
+playerScores = []*players
 currentPlayer = 1
-[phrases.append(line.strip('\n')) for line in f]
 phrase_list = []
 guesses = []
-playing = True
-win = False
-complete = False
-numGuesses = 0
-numWrongGuesses=0
-maxGuesses = 7
-numWins = 0
-guessesString=''
-phrase = getPhrase(phrases, phrase_list)
+wheelVector = 0
+
+numRounds = 3
+
+phrase = getPhrase(categories, phrase_list)
 phrase_list.append(phrase)
-emptyPhrase = getPhraseBlank()
-phrase = getPhrase(phrases, phrase_list)
-phrase_list.append(phrase)
-emptyPhrase = getPhraseBlank()
-print(phrase)
+emptyPhrase = getPhraseBlank(phrase)
+
+lblPlayer = Label(main_frame, text=f"Player {currentPlayer}")
+lblPlayer.pack()
 
 # TextBox Creation
-inputtxt = tk.Text(frame,
+inputtxt = Text(main_frame,
             height = 1,
             width = 25)
 inputtxt.pack()
   
 # Button Creation
-guessButton = tk.Button(frame,
+guessButton = Button(main_frame,
             text = "Guess", 
             command = makeGuess)
 guessButton.pack()
   
 # Label Creation
-lbl = tk.Label(frame, text = f"Player {currentPlayer}, make a guess to begin")
-lbl.pack()
+lblGuesses = Label(main_frame, text = f"Guesses: {guesses}")
+lblGuesses.pack()
 
-lblError = tk.Label(frame, text = "")
+lblError = Label(main_frame, text = "")
 lblError.pack()
 
-phraselbl = tk.Label(frame, text = getPhraseBlank())
-phraselbl.pack()
+lblPhrase = Label(main_frame, text = getPhraseBlank(phrase))
+lblPhrase.pack()
 
-moveslbl = tk.Label(frame, text=f'{maxGuesses-numWrongGuesses} wrong guesses left')
-moveslbl.pack()
+lblRounds = Label(main_frame, text=f'{numRounds} rounds left')
+lblRounds.pack()
 
-winslbl = tk.Label(frame, text=f"Number of wins: {numWins}")
-winslbl.pack()
-
-playerlbl = tk.Label(frame, text=f"It's player {currentPlayer}s turn")
-playerlbl.pack()
-
-resetButton = tk.Button(frame,
+# Button Creation
+resetButton = Button(main_frame,
             text = "Play Again", 
             command = reset)
 resetButton.pack()
 
-frame.mainloop()
+wheelCanvas = Canvas(wheel_frame, bg='grey')
+drawWheel(wheelCanvas)
+wheelCanvas.pack() 
+
+spinWheelButton = Button(wheel_frame, 
+        text='Spin!',
+        command = randomValue)
+spinWheelButton.pack()
+
+main_frame.mainloop()
